@@ -54,14 +54,20 @@ def read_login():
 def update_total(full, total):
     cate = full['科目名称'].unique()
     total_new = sum_new(full)
+    print(total_new)
     for i in range(total.shape[0]):
         name = total.at[i, '班组']
         if name == '车间成本':
             continue
         for j in cate:
             j = j + '总成本'
-            cheng = total.at[i, j]
-            total_new.loc[name, j] = cheng
+            if j in total.keys():
+                print(i,j)
+                print(total.keys())
+                cheng = total.at[i, j]
+                total_new.loc[name, j] = cheng
+            else:
+                total_new.loc[name, j] = 0
     name = '总'
     total_new = total_new.drop('总', axis=0)
 
