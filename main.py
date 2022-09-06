@@ -63,6 +63,8 @@ def update_total(full, total):
             cheng = total.at[i, j]
             total_new.loc[name, j] = cheng
     name = '总'
+    total_new = total_new.drop('总', axis=0)
+
     total_new.loc[name] = total_new.apply(lambda x: pd.to_numeric(x, errors='coerce').sum())
 
     for i in cate:
@@ -73,6 +75,7 @@ def update_total(full, total):
     total_new = total_new.fillna(0)
     total_new = total_new.replace([np.inf], 1)
     total_new.loc['总','班组']='总'
+    # total_new = total_new.drop('0')
     return total_new
 
 def write_login(login):
@@ -117,7 +120,7 @@ def concat_two_df(df1: pd.DataFrame, df2:pd.DataFrame):
 def upload_file():
     file = st.file_uploader('上传你的文件')
     cirtify = st.button('点击确认')
-    print(file)
+    # print(file)
     if file is not None and cirtify:
         data = pd.read_csv(file)
         st.write(data)
@@ -229,7 +232,8 @@ def add_one_row(df, filename,upload_key, hand_input_key,resource = None):
                     df.to_csv(filename, encoding='gbk')
                     session_state['hand_input'] = False
             session_state['hand_input_dict'] = hand_input_dict
-            print(hand_input_dict)
+            # print(hand_input_dict)
+
 
 
 
@@ -307,7 +311,7 @@ def login_page(name, sn):
             session_state['change_sn'] = True
     # print(session_state['change_name'])
     if 'change_name' in session_state and session_state['change_name']:
-        print(session_state['change_name'])
+        # print(session_state['change_name'])
         name0 = st.text_input('输入原用户名',value = session_state['name0'], key='name0')
         name1 = st.text_input('输入新用户名',value = session_state['name1'], key='name1')
         name2 = st.text_input('再次输入新用户名',value = session_state['name2'], key='name2')
@@ -331,7 +335,7 @@ def login_page(name, sn):
         session_state['name2'] = ''
 
     if 'change_sn' in session_state and session_state['change_sn']:
-        print(session_state['change_sn'])
+        # print(session_state['change_sn'])
         sn0 = st.text_input('输入原密码', value=session_state['sn0'], key='sn0')
         sn1 = st.text_input('输入新密码', value=session_state['sn1'], key='sn1')
         sn2 = st.text_input('输入新密码', value=session_state['sn2'], key='sn2')
@@ -355,7 +359,7 @@ def login_page(name, sn):
         session_state['sn0'] = ''
         session_state['sn1'] = ''
         session_state['sn2'] = ''
-    print('修改结果：',df)
+    # print('修改结果：',df)
     df.to_csv('./add_on/admin.csv', index=False)
 
 
@@ -363,7 +367,8 @@ def login_page(name, sn):
         login=True
         st.success('登录成功')
         # st.balloons()
-        # print('you have logined')
+        #
+        # ('you have logined')
         session_state['logined'] = True
         # act()
     else:
@@ -425,29 +430,29 @@ function(params) {
         """
     )
     total = total.round(2)
-    print(total)
+    # print(total)
     for i in total.keys():
         if '比例' in i:
             gb.configure_column(i, cellStyle= cells_jscode)
         elif '总成本' in i:
             gb.configure_column(i, editable=True)
     gridOptions = gb.build()
-    with st.form('台账') as f1:
-        data = AgGrid(
-            total,
-            gridOptions=gridOptions,
-            enable_enterprise_modules=True,
-            fit_columns_on_grid_load=True,
-            allow_unsafe_jscode=True,
-            try_to_convert_back_to_original_types=True,
-            update_mode='value_changed'
-            # editable=True
-        )
-        changeing = st.form_submit_button('提交修改')
-        if changeing:
-            session_state['changed_data'] = data['data']
-            st.write(session_state['changed_data'])
-            session_state['changed_data'].to_csv('./add_on/total.csv', encoding='gbk', index=False)
+
+    data = AgGrid(
+        total,
+        gridOptions=gridOptions,
+        enable_enterprise_modules=True,
+        fit_columns_on_grid_load=True,
+        allow_unsafe_jscode=True,
+        try_to_convert_back_to_original_types=True,
+        update_mode='value_changed'
+        # editable=True
+    )
+    changeing = st.button('提交修改',key='changeing')
+    if session_state.changeing:
+        session_state['changed_data'] = data['data']
+        st.success('提交成功')
+        session_state['changed_data'].to_csv('./add_on/total.csv', encoding='gbk', index=False)
 
     # st.subheader('写实账')
     ge = GridOptionsBuilder.from_dataframe(full)
@@ -459,20 +464,20 @@ function(params) {
     ge = ge.build()
     name_and_download('写实账', full, './add_on/full.csv')
     # st.dataframe(full)
-    with st.form('写实账') as f2:
 
-        ff = AgGrid(
-            pd.DataFrame(full, columns=full.columns),
-            # fit_columns_on_grid_load=True,
-            gridOptions=ge,
-            height=500,
-            enable_enterprise_modules=True
-        )
-        ff_c = st.form_submit_button('确认提交写实账修改')
-        if ff_c:
-            session_state['changed_data_ff'] = ff['data']
-            st.write(session_state['changed_data_ff'])
-            session_state['changed_data_ff'].to_csv('./add_on/full.csv', encoding='gbk', index=False)
+
+    ff = AgGrid(
+        pd.DataFrame(full, columns=full.columns),
+        # fit_columns_on_grid_load=True,
+        gridOptions=ge,
+        height=500,
+        enable_enterprise_modules=True
+    )
+    ff_c = st.button('确认提交写实账修改',key ='changed_ff')
+    if session_state.changed_ff:
+        session_state['changed_data_ff'] = ff['data']
+        st.write('提交写实账完成')
+        session_state['changed_data_ff'].to_csv('./add_on/full.csv', encoding='gbk', index=False)
 
     # add_one_row(full, './full.csv','full_upload', 'full_hand_input', resource)
     # todo 暂时粘贴过来
@@ -512,7 +517,7 @@ function(params) {
                     session_state['full_upload'] = False
                 else:
                     session_state['data'] = data
-                print('session_state:', session_state)
+                # print('session_state:', session_state)
     if 'full_hand_input' in session_state.keys():
         if session_state['full_hand_input']:
             st.text('hand input')
@@ -695,7 +700,7 @@ if __name__ == '__main__':
 
     df = pd.read_csv('./add_on/admin.csv')
     session_state['df']= df
-    print(df)
+    # print(df)
     name = df.at[0, 'name']
     sn = df.at[0, ' sn']
 
