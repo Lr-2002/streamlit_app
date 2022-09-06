@@ -7,11 +7,42 @@ import pandas as pd
 login = False
 session_state = st.session_state
 
+def sum_new(df):
+    # df = pd.read_csv('./add_on/full.csv', encoding='gbk')
+    kemu = df['科目名称'].unique()
+    cate = df['班组'].unique()
+    total = {}
+    for i in cate:
+        total[i] = {}
+        for j in kemu:
+            total[i][j] = 0
+    for i in range(df.shape[0]):
+        name = df.at[i, '班组']
+        lei = df.at[i, '科目名称']
+        jin = df.at[i, '金额']
+        total[name][lei] += jin
+
+    colum = ['班组']
+
+    for i in kemu:
+        colum.append(i + '总成本')
+        colum.append(i + '消耗')
+        colum.append(i + '消耗比例')
+
+    dd = pd.DataFrame(columns=colum)
+    num = 0
+    for i in cate:
+        dd.loc[num, '班组'] = i
+        num += 1
 
 
+    dd = dd.set_index('班组',drop=False).fillna(0.0)
+    for i in cate:
+        for j in kemu:
+            dd.loc[i, j + '消耗'] = total[i][j]
+    return dd
 
-# session_state['upload'] = False
-# session_state['hand_input'] = False
+
 def read_login():
     with open('./add_on/ppp.txt', 'r') as f:
         login = f.read()
@@ -22,28 +53,27 @@ def read_login():
 
 def update_total(full, total):
     cate = full['科目名称'].unique()
-
+    total_new = sum_new(full)
     for i in range(total.shape[0]):
-        # print(i)
+        name = total.at[i, '班组']
+        if name == '车间成本':
+            continue
         for j in cate:
-            name = total.at[i, '班组']
-            print(j)
-            # print(full['班组'] == name )
-            # print(full['科目名称'] == j)
-            money = full[(full['班组'] == name) & (full['科目名称'] == j)]['金额'].sum()
-            # total[(total['班组'] == name)][j + '成本消耗'] = money
-            total.at[i, j + '成本消耗'] = money
-    for i in total.keys():
-        if '成本' in i:
-            total.at[total.shape[0] - 1, i] = total[i].sum()
+            j = j + '总成本'
+            cheng = total.at[i, j]
+            total_new.loc[name, j] = cheng
+    name = '总'
+    total_new.loc[name] = total_new.apply(lambda x: pd.to_numeric(x, errors='coerce').sum())
 
     for i in cate:
         source = i + '总成本'
-        cost = i + '成本消耗'
-        rate = i + '成本消耗比例'
-        total[rate] = total[cost] / total[source]
-
-    return total
+        cost = i + '消耗'
+        rate = i + '消耗比例'
+        total_new[rate] = total_new[cost] / total_new[source]
+    total_new = total_new.fillna(0)
+    total_new = total_new.replace([np.inf], 1)
+    total_new.loc['总','班组']='总'
+    return total_new
 
 def write_login(login):
     with open('./add_on/ppp.txt','w') as f:
@@ -67,6 +97,20 @@ def change_type(df1:pd.DataFrame, df2 :dict):
     add_list = [df1, df2]
     df = pd.concat(add_list)
     return df
+
+def concat_two_df(df1: pd.DataFrame, df2:pd.DataFrame):
+    judge = True
+
+    for i, j in zip(df1.keys(), df2.keys()):
+        if i != j:
+            judge = False
+
+    if judge:
+        df = pd.concat([df1, df2])
+        return df
+    else:
+        st.write('读取有问题')
+        return None
 
 
 @st.cache
@@ -381,36 +425,55 @@ function(params) {
         """
     )
     total = total.round(2)
+    print(total)
     for i in total.keys():
-        if '成本消耗比例' in i:
+        if '比例' in i:
             gb.configure_column(i, cellStyle= cells_jscode)
         elif '总成本' in i:
             gb.configure_column(i, editable=True)
     gridOptions = gb.build()
-    data = AgGrid(
-        total,
-        gridOptions=gridOptions,
-        enable_enterprise_modules=True,
-        fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True,
-        # editable=True
-    )
+    with st.form('台账') as f1:
+        data = AgGrid(
+            total,
+            gridOptions=gridOptions,
+            enable_enterprise_modules=True,
+            fit_columns_on_grid_load=True,
+            allow_unsafe_jscode=True,
+            try_to_convert_back_to_original_types=True,
+            update_mode='value_changed'
+            # editable=True
+        )
+        changeing = st.form_submit_button('提交修改')
+        if changeing:
+            session_state['changed_data'] = data['data']
+            st.write(session_state['changed_data'])
+            session_state['changed_data'].to_csv('./add_on/total.csv', encoding='gbk', index=False)
 
     # st.subheader('写实账')
     ge = GridOptionsBuilder.from_dataframe(full)
     # gg.configure_side_bar()
 
     ge.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
+    ge.configure_column('班组', editable=True)
+
     ge = ge.build()
     name_and_download('写实账', full, './add_on/full.csv')
     # st.dataframe(full)
-    AgGrid(
-        pd.DataFrame(full, columns=full.columns),
-        # fit_columns_on_grid_load=True,
-        gridOptions=ge,
-        height=500,
-        enable_enterprise_modules=True
-    )
+    with st.form('写实账') as f2:
+
+        ff = AgGrid(
+            pd.DataFrame(full, columns=full.columns),
+            # fit_columns_on_grid_load=True,
+            gridOptions=ge,
+            height=500,
+            enable_enterprise_modules=True
+        )
+        ff_c = st.form_submit_button('确认提交写实账修改')
+        if ff_c:
+            session_state['changed_data_ff'] = ff['data']
+            st.write(session_state['changed_data_ff'])
+            session_state['changed_data_ff'].to_csv('./add_on/full.csv', encoding='gbk', index=False)
+
     # add_one_row(full, './full.csv','full_upload', 'full_hand_input', resource)
     # todo 暂时粘贴过来
     df = full
@@ -430,8 +493,25 @@ function(params) {
             cirtify = st.button('点击确认')
             if file is not None and cirtify:
                 st.text('您上传的文件内容如下')
-                data = pd.read_csv(file)
+                name = file.name
+                data = None
+                if name.endswith('xlsx'):
+                    st.text('xlsx')
+                    data = pd.read_excel(file)
+                elif name.endswith('csv'):
+                    st.text('csv')
+                    data = pd.read_csv(file,encoding='gbk')
+
+                else:
+                    st.warning('错误上传，只支持xlsx文件或者csv文件')
                 st.write(data)
+                if data is not None:
+                    session_state['data'] = data
+                    full = concat_two_df(full, data)
+                    full.to_csv('./add_on/full.csv', encoding='gbk', index=False)
+                    session_state['full_upload'] = False
+                else:
+                    session_state['data'] = data
                 print('session_state:', session_state)
     if 'full_hand_input' in session_state.keys():
         if session_state['full_hand_input']:
@@ -516,20 +596,60 @@ function(params) {
         with col1:
             upload = st.button('上传材料表格')
             if upload:
-                session_state['upload'] = True
+                session_state['rs_upload'] = True
         with col2:
             hand_input = st.button('手动输入材料')
             if hand_input:
                 session_state['rs_hand_input'] = True
         if 'rs_upload' in session_state.keys():
             if session_state['rs_upload']:
-                file = st.file_uploader('上传你的文件')
-                cirtify = st.button('点击确认')
-                if file is not None and cirtify:
+                rs_file = st.file_uploader('上传你的文件', key='rs_file')
+                cirtify = st.button('点击确认',key='rs_file_upload')
+                if rs_file is not None and cirtify:
                     st.text('您上传的文件内容如下')
-                    data = pd.read_csv(file)
-                    st.write(data)
+                    name = rs_file.name
+                    dat = None
+                    if name.endswith('xlsx'):
+                        st.text('xlsx')
+                        dat = pd.read_excel(rs_file)
+                    elif name.endswith('csv'):
+                        st.text('csv')
+                        dat = pd.read_csv(rs_file, encoding='gbk')
+
+                    else:
+                        st.warning('错误上传，只支持xlsx文件或者csv文件')
+                    st.write(dat)
+                    if dat is not None:
+                        session_state['dat'] = data
+                        resource = concat_two_df(resource, dat)
+                        resource.to_csv('./add_on/resource.csv', encoding='gbk', index=False)
+                        session_state['rs_upload'] = False
+                    else:
+                        session_state['dat'] = dat
                     print('session_state:', session_state)
+
+
+
+
+
+
+
+
+
+
+
+
+                    # st.text('您上传的文件内容如下')
+                    # data = pd.read_csv(file)
+                    # st.write(data)
+                    # print('session_state:', session_state)
+
+
+
+
+
+
+
         if 'rs_hand_input' in session_state.keys():
             if session_state['rs_hand_input']:
                 st.text('rs_hand input')
