@@ -118,7 +118,7 @@ def concat_two_df(df1: pd.DataFrame, df2:pd.DataFrame):
         df = pd.concat([df1, df2])
         return df
     else:
-        st.write('读取有问题')
+        st.write('请确认你提交的文件的列表和我一致')
         return None
 
 
