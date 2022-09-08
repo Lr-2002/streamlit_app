@@ -529,9 +529,9 @@ function(params) {
             st.text('hand input')
             if 'full_hand_input_dict' in session_state.keys():
                 hand_input_dict = session_state['full_hand_input_dict']
-                if hand_input_dict['单价（元）'][0] != '' and hand_input_dict['数量'][0] != '':
+                if hand_input_dict['单价'][0] != '' and hand_input_dict['数量'][0] != '':
                     # print()
-                    hand_input_dict['金额'] = [str(float(hand_input_dict['单价（元）'][0]) * float(hand_input_dict['数量'][0]))]
+                    hand_input_dict['金额'] = [str(float(hand_input_dict['单价'][0]) * float(hand_input_dict['数量'][0]))]
             else:
                 hand_input_dict = {}
                 for i in df.keys():
